@@ -58,8 +58,6 @@ class Transaction(db.Model):
     v25 = db.Column(db.Float)
     v26 = db.Column(db.Float)
     v27 = db.Column(db.Float)
-    v27 = db.Column(db.Float)
-    v28 = db.Column(db.Float)
     v28 = db.Column(db.Float)
 
     user = db.relationship('User', backref=db.backref('transactions', lazy=True))
