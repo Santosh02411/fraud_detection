@@ -54,7 +54,6 @@ def seed_transactions(count=15):
             db.session.add(tx)
             db.session.flush() # Get the ID
             print(f"Transaction {i+1}: {amount} at {merchant} ({'FRAUD' if is_fraud else 'Normal'})")
-            print(f"Transaction {i+1}: {amount} at {merchant} ({'FRAUD' if is_fraud else 'Normal'})")
 
             if is_fraud:
                 alert = FraudAlert(
