@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ..database import db, Transaction, FraudAlert, User
 from ..models.ml_models import FraudDetectionModel
@@ -8,23 +8,47 @@ import datetime
 transactions_bp = Blueprint('transactions', __name__)
 
 # Global ML model instance
-ml_model = FraudDetectionModel()
+ml_model = None
+
+def get_ml_model():
+    """Get or initialize the ML model singleton"""
+    global ml_model
+    if ml_model is None:
+        ml_model = FraudDetectionModel()
+        initialize_ml_model()
+    return ml_model
 
 def initialize_ml_model():
     """Initialize the ML model (load or train)"""
-    if not ml_model.models:
-        if not ml_model.load_models():
-            # Train new models if no saved models exist
-            print("No saved models found. Training new models on real dataset...")
-            df = ml_model.load_data('data/creditcard.csv')
-            X, y = ml_model.preprocess_data(df)
-            ml_model.train_models(X, y)
-            ml_model.save_models()
+    global ml_model
+    if ml_model is None:
+        ml_model = FraudDetectionModel()
+    
+    try:
+        if not ml_model.models:
+            print("Models not initialized. Attempting to load from disk...")
+            if not ml_model.load_models():
+                # Train new models if no saved models exist
+                print("No saved models found. Training new models on synthetic data...")
+                df = ml_model.load_data(None)  # Use synthetic data
+                X, y = ml_model.preprocess_data(df)
+                print(f"Training on {len(X)} samples...")
+                ml_model.train_models(X, y)
+                ml_model.save_models()
+                print("✓ Models trained and saved successfully!")
+            else:
+                print("✓ Models loaded successfully!")
+                print(f"  Available models: {list(ml_model.models.keys())}")
+    except Exception as e:
+        print(f"Error initializing ML models: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 
 def process_prediction(user_id, data):
     # Initialize ML model if needed
-    initialize_ml_model()
+    model = get_ml_model()
     
     # Prepare transaction data
     transaction_data = {
@@ -40,12 +64,12 @@ def process_prediction(user_id, data):
             transaction_data[f'V{i}'] = np.random.normal(0, 1)
     
     # Get fraud prediction with enhanced insights
-    prediction_result = ml_model.predict_fraud(transaction_data)
+    prediction_result = model.predict_fraud(transaction_data)
     
     # Behavior analysis for this user
     user_history = Transaction.query.filter_by(user_id=user_id).order_by(Transaction.timestamp.desc()).limit(10).all()
     history_list = [{'Amount': t.amount, 'Merchant': t.merchant} for t in user_history]
-    behavior = ml_model.analyze_user_behavior(history_list)
+    behavior = model.analyze_user_behavior(history_list)
     
     # Create transaction record
     transaction = Transaction(
@@ -78,7 +102,7 @@ def process_prediction(user_id, data):
         db.session.commit()
     
     # Get feature importance
-    feature_importance = ml_model.get_feature_importance('xgboost')
+    feature_importance = model.get_feature_importance('xgboost')
     
     return {
         'transaction_id': transaction.id,
