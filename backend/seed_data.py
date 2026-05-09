@@ -50,11 +50,8 @@ def seed_transactions(count=15):
                 timestamp=datetime.datetime.utcnow() - datetime.timedelta(days=random.randint(0, 7), hours=random.randint(0, 23)),
                 **features
             )
-            
             db.session.add(tx)
             db.session.flush() # Get the ID
-            
-
             if is_fraud:
                 alert = FraudAlert(
                     transaction_id=tx.id,
